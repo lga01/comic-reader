@@ -1,0 +1,23 @@
+# Carpetas de build de .NET
+bin/
+obj/
+publish/
+
+# Archivos de usuario de Visual Studio
+*.user
+*.suo
+
+# Carpetas de IDE
+.vs/
+.vscode/
+.idea/
+
+# Archivos de sistema operativo
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Node (si en algún momento usas herramientas JS junto al proyecto)
+node_modules/
