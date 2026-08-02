@@ -2091,11 +2091,11 @@
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "E:\\Proyectos\\ComicApp\\ComicReader\\ComicReader.csproj",
+      "projectUniqueName": "e:\\Proyectos\\ComicApp\\ComicReader\\ComicReader.csproj",
       "projectName": "ComicReader",
-      "projectPath": "E:\\Proyectos\\ComicApp\\ComicReader\\ComicReader.csproj",
+      "projectPath": "e:\\Proyectos\\ComicApp\\ComicReader\\ComicReader.csproj",
       "packagesPath": "C:\\Users\\xdrar\\.nuget\\packages\\",
-      "outputPath": "E:\\Proyectos\\ComicApp\\ComicReader\\obj\\",
+      "outputPath": "e:\\Proyectos\\ComicApp\\ComicReader\\obj\\",
       "projectStyle": "PackageReference",
       "configFilePaths": [
         "C:\\Users\\xdrar\\AppData\\Roaming\\NuGet\\NuGet.Config"
