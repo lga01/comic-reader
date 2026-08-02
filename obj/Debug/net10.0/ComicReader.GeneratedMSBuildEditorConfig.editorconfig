@@ -18,45 +18,45 @@ build_property.EntryPointFilePath =
 build_property._SupportedPlatformList = browser
 build_property.RootNamespace = ComicReader
 build_property.RootNamespace = ComicReader
-build_property.ProjectDir = e:\Proyectos\ComicApp\ComicReader\
+build_property.ProjectDir = E:\Proyectos\ComicApp\ComicReader\
 build_property.EnableComHosting = 
 build_property.EnableGeneratedComInterfaceComImportInterop = false
 build_property.RazorLangVersion = 10.0
 build_property.SupportLocalizedComponentNames = 
 build_property.GenerateRazorMetadataSourceChecksumAttributes = 
-build_property.MSBuildProjectDirectory = e:\Proyectos\ComicApp\ComicReader
+build_property.MSBuildProjectDirectory = E:\Proyectos\ComicApp\ComicReader
 build_property._RazorSourceGeneratorDebug = 
 build_property.EffectiveAnalysisLevelStyle = 10.0
 build_property.EnableCodeStyleSeverity = 
 
-[e:/Proyectos/ComicApp/ComicReader/App.razor]
+[E:/Proyectos/ComicApp/ComicReader/App.razor]
 build_metadata.AdditionalFiles.TargetPath = QXBwLnJhem9y
 build_metadata.AdditionalFiles.CssScope = 
 
-[e:/Proyectos/ComicApp/ComicReader/Pages/Counter.razor]
+[E:/Proyectos/ComicApp/ComicReader/Pages/Counter.razor]
 build_metadata.AdditionalFiles.TargetPath = UGFnZXNcQ291bnRlci5yYXpvcg==
 build_metadata.AdditionalFiles.CssScope = 
 
-[e:/Proyectos/ComicApp/ComicReader/Pages/Home.razor]
+[E:/Proyectos/ComicApp/ComicReader/Pages/Home.razor]
 build_metadata.AdditionalFiles.TargetPath = UGFnZXNcSG9tZS5yYXpvcg==
 build_metadata.AdditionalFiles.CssScope = 
 
-[e:/Proyectos/ComicApp/ComicReader/Pages/NotFound.razor]
+[E:/Proyectos/ComicApp/ComicReader/Pages/NotFound.razor]
 build_metadata.AdditionalFiles.TargetPath = UGFnZXNcTm90Rm91bmQucmF6b3I=
 build_metadata.AdditionalFiles.CssScope = 
 
-[e:/Proyectos/ComicApp/ComicReader/Pages/Weather.razor]
+[E:/Proyectos/ComicApp/ComicReader/Pages/Weather.razor]
 build_metadata.AdditionalFiles.TargetPath = UGFnZXNcV2VhdGhlci5yYXpvcg==
 build_metadata.AdditionalFiles.CssScope = 
 
-[e:/Proyectos/ComicApp/ComicReader/_Imports.razor]
+[E:/Proyectos/ComicApp/ComicReader/_Imports.razor]
 build_metadata.AdditionalFiles.TargetPath = X0ltcG9ydHMucmF6b3I=
 build_metadata.AdditionalFiles.CssScope = 
 
-[e:/Proyectos/ComicApp/ComicReader/Layout/MainLayout.razor]
+[E:/Proyectos/ComicApp/ComicReader/Layout/MainLayout.razor]
 build_metadata.AdditionalFiles.TargetPath = TGF5b3V0XE1haW5MYXlvdXQucmF6b3I=
 build_metadata.AdditionalFiles.CssScope = b-s6co2wdetq
 
-[e:/Proyectos/ComicApp/ComicReader/Layout/NavMenu.razor]
+[E:/Proyectos/ComicApp/ComicReader/Layout/NavMenu.razor]
 build_metadata.AdditionalFiles.TargetPath = TGF5b3V0XE5hdk1lbnUucmF6b3I=
 build_metadata.AdditionalFiles.CssScope = b-4h01tat2is
