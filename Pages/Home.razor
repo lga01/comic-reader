@@ -1,0 +1,169 @@
+﻿@page "/"
+@inject IJSRuntime JS
+
+<div class="reader-app">
+    @if (!signedIn)
+    {
+        <div class="library-empty">
+            <h1>Mi lector de cómics</h1>
+            <p>Conecta tu cuenta de Google Drive para ver tus cómics</p>
+            <button class="btn-primary" @onclick="SignIn">Conectar con Google Drive</button>
+            @if (signInError != null)
+            {
+                <p class="error-msg">@signInError</p>
+            }
+        </div>
+    }
+    else if (currentComic == null)
+    {
+        <div class="library">
+            <div class="library-header">
+                <h1>Mi biblioteca</h1>
+                <button class="btn-secondary" @onclick="LoadComics">Actualizar lista</button>
+            </div>
+            @if (loadingLibrary)
+            {
+                <p>Cargando cómics...</p>
+            }
+            else if (comics.Count == 0)
+            {
+                <p>No se encontraron archivos .cbz en tu Drive.</p>
+            }
+            else
+            {
+                <ul class="comic-list">
+                    @foreach (var comic in comics)
+                    {
+                        <li @onclick="() => OpenComic(comic)">
+                            <span class="comic-name">@comic.Name</span>
+                        </li>
+                    }
+                </ul>
+            }
+        </div>
+    }
+    else
+    {
+        <div class="reader" tabindex="0" @onkeydown="HandleKeyDown">
+            <div class="reader-toolbar">
+                <button @onclick="CloseComic">← Biblioteca</button>
+                <span>@currentComic.Name (@(pageUrls.Count > 0 ? currentPage + 1 : 0) / @pageUrls.Count)</span>
+            </div>
+            <div class="reader-page" @onclick="NextPage">
+                @if (pageUrls.Count > 0)
+                {
+                    <img src="@pageUrls[currentPage]" alt="página @(currentPage + 1)" />
+                }
+                else
+                {
+                    <p>Cargando...</p>
+                }
+            </div>
+            <div class="reader-nav">
+                <button @onclick="PrevPage" disabled="@(currentPage == 0)">‹ Anterior</button>
+                <button @onclick="NextPage" disabled="@(currentPage >= pageUrls.Count - 1)">Siguiente ›</button>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private record ComicInfo(string Id, string Name);
+
+    private bool signedIn;
+    private string? signInError;
+    private bool loadingLibrary;
+
+    private List<ComicInfo> comics = new();
+    private ComicInfo? currentComic;
+    private List<string> pageUrls = new();
+    private int currentPage;
+
+    private async Task SignIn()
+    {
+        signInError = null;
+        try
+        {
+            await JS.InvokeVoidAsync("driveAuth.signIn");
+            signedIn = true;
+            await LoadComics();
+        }
+        catch
+        {
+            signInError = "No se pudo conectar con Google. Inténtalo de nuevo.";
+        }
+    }
+
+    private async Task LoadComics()
+    {
+        loadingLibrary = true;
+        StateHasChanged();
+
+        var result = await JS.InvokeAsync<DriveFile[]>("driveAuth.listComics");
+        comics = result.Select(f => new ComicInfo(f.Id, f.Name)).ToList();
+
+        loadingLibrary = false;
+        StateHasChanged();
+    }
+
+    private async Task OpenComic(ComicInfo comic)
+    {
+        currentComic = comic;
+        pageUrls.Clear();
+        currentPage = 0;
+        StateHasChanged();
+
+        var urls = await JS.InvokeAsync<string[]>("driveAuth.openComic", comic.Id);
+        pageUrls = urls.ToList();
+
+        var savedPage = await JS.InvokeAsync<int>("driveAuth.getProgress", comic.Id);
+        currentPage = savedPage < pageUrls.Count ? savedPage : 0;
+
+        StateHasChanged();
+    }
+
+    private void CloseComic()
+    {
+        currentComic = null;
+        pageUrls.Clear();
+        currentPage = 0;
+    }
+
+    private async Task NextPage()
+    {
+        if (currentPage < pageUrls.Count - 1)
+        {
+            currentPage++;
+            await SaveProgress();
+        }
+    }
+
+    private async Task PrevPage()
+    {
+        if (currentPage > 0)
+        {
+            currentPage--;
+            await SaveProgress();
+        }
+    }
+
+    private async Task SaveProgress()
+    {
+        if (currentComic != null)
+        {
+            await JS.InvokeVoidAsync("driveAuth.saveProgress", currentComic.Id, currentPage);
+        }
+    }
+
+    private async Task HandleKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "ArrowRight") await NextPage();
+        else if (e.Key == "ArrowLeft") await PrevPage();
+    }
+
+    private class DriveFile
+    {
+        public string Id { get; set; } = "";
+        public string Name { get; set; } = "";
+    }
+}
