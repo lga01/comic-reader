@@ -1,8 +1,8 @@
 {
   "version": 2,
-  "dgSpecHash": "lzq0cXm7cpY=",
+  "dgSpecHash": "dzzr+O2igtY=",
   "success": true,
-  "projectFilePath": "E:\\Proyectos\\ComicApp\\ComicReader\\ComicReader.csproj",
+  "projectFilePath": "e:\\Proyectos\\ComicApp\\ComicReader\\ComicReader.csproj",
   "expectedPackageFiles": [
     "C:\\Users\\xdrar\\.nuget\\packages\\microsoft.aspnetcore.app.internal.assets\\10.0.9\\microsoft.aspnetcore.app.internal.assets.10.0.9.nupkg.sha512",
     "C:\\Users\\xdrar\\.nuget\\packages\\microsoft.aspnetcore.authorization\\10.0.9\\microsoft.aspnetcore.authorization.10.0.9.nupkg.sha512",
