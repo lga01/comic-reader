@@ -71,7 +71,125 @@ window.driveAuth = (() => {
         const data = await res.json();
         return data.files.map(f => ({ id: f.id, name: f.name }));
     }
+    async function listComicsByCategory() {
+        try {
 
+            console.log("=== INICIO listComicsByCategory ===");
+
+            // 1. Buscar carpeta Comics
+            const rootQuery =
+                "name = 'Comics' and mimeType = 'application/vnd.google-apps.folder' and trashed = false";
+
+            console.log("Buscando carpeta Comics...");
+            console.log("Query:", rootQuery);
+
+            const rootRes = await fetch(
+                "https://www.googleapis.com/drive/v3/files?" +
+                new URLSearchParams({
+                    q: rootQuery,
+                    fields: "files(id,name)"
+                }),
+                { headers: authHeaders() }
+            );
+
+            console.log("Respuesta carpeta Comics:", rootRes.status);
+
+            const rootData = await rootRes.json();
+
+            console.log("Root data:", rootData);
+
+            if (!rootData.files?.length) {
+                console.warn("NO se encontró la carpeta Comics");
+                return [];
+            }
+
+            const comicsFolder = rootData.files[0];
+
+            console.log("Carpeta Comics encontrada:");
+            console.log("ID:", comicsFolder.id);
+            console.log("Nombre:", comicsFolder.name);
+
+            // 2. Buscar subcarpetas
+            const foldersQuery =
+                `'${comicsFolder.id}' in parents and mimeType = 'application/vnd.google-apps.folder' and trashed = false`;
+
+            console.log("Buscando subcarpetas...");
+            console.log("Query:", foldersQuery);
+
+            const foldersRes = await fetch(
+                "https://www.googleapis.com/drive/v3/files?" +
+                new URLSearchParams({
+                    q: foldersQuery,
+                    fields: "files(id,name)",
+                    pageSize: "200",
+                    orderBy: "name"
+                }),
+                { headers: authHeaders() }
+            );
+
+            console.log("Respuesta subcarpetas:", foldersRes.status);
+
+            const foldersData = await foldersRes.json();
+
+            console.log("Subcarpetas encontradas:", foldersData.files);
+
+            const result = [];
+
+            for (const folder of foldersData.files ?? []) {
+
+                console.log("--------------------------------");
+                console.log("Procesando carpeta:", folder.name);
+                console.log("ID:", folder.id);
+
+                const comicsQuery =
+                    `'${folder.id}' in parents and name contains '.cbz' and trashed = false`;
+
+                console.log("Query comics:", comicsQuery);
+
+                const comicsRes = await fetch(
+                    "https://www.googleapis.com/drive/v3/files?" +
+                    new URLSearchParams({
+                        q: comicsQuery,
+                        fields: "files(id,name)",
+                        pageSize: "500",
+                        orderBy: "name"
+                    }),
+                    { headers: authHeaders() }
+                );
+
+                console.log(
+                    `Respuesta comics (${folder.name}):`,
+                    comicsRes.status
+                );
+
+                const comicsData = await comicsRes.json();
+
+                console.log(
+                    `Comics encontrados en ${folder.name}:`,
+                    comicsData.files?.length ?? 0
+                );
+
+                console.log(comicsData.files);
+
+                result.push({
+                    name: folder.name,
+                    comics: (comicsData.files ?? []).map(f => ({
+                        id: f.id,
+                        name: f.name
+                    }))
+                });
+            }
+
+            console.log("Resultado final:", result);
+            console.log("=== FIN listComicsByCategory ===");
+
+            return result;
+        }
+        catch (err) {
+            console.error("ERROR listComicsByCategory:", err);
+            throw err;
+        }
+    }
     // ---------- Abrir y leer un cómic ----------
 
     function guessMime(name) {
@@ -208,5 +326,5 @@ window.driveAuth = (() => {
         await writeProgressData(data);
     }
 
-    return { signIn, isSignedIn, listComics, openComic, getProgress, saveProgress };
+    return { signIn, isSignedIn, listComics, listComicsByCategory, openComic, getProgress, saveProgress };
 })();

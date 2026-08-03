@@ -25,18 +25,42 @@
             {
                 <p>Cargando cómics...</p>
             }
-            else if (comics.Count == 0)
+            else if (categories.Count == 0)
             {
                 <p>No se encontraron archivos .cbz en tu Drive.</p>
             }
             else
             {
                 <ul class="comic-list">
-                    @foreach (var comic in comics)
+                    @* @foreach (var comic in comics)
                     {
                         <li @onclick="() => OpenComic(comic)">
                             <span class="comic-name">@comic.Name</span>
                         </li>
+                    } *@
+                    @foreach (var category in categories)
+                    {
+                        <details class="comic-folder">
+                            <summary>
+                                📁 @category.Name (@category.Comics.Count)
+                            </summary>
+
+                            @if (category.Comics.Count == 0)
+                            {
+                                <p class="empty-folder">No hay cómics.</p>
+                            }
+                            else
+                            {
+                                <ul class="comic-list">
+                                    @foreach (var comic in category.Comics)
+                                    {
+                                        <li @onclick="() => OpenComic(comic)">
+                                            📖 @comic.Name
+                                        </li>
+                                    }
+                                </ul>
+                            }
+                        </details>
                     }
                 </ul>
             }
@@ -68,6 +92,12 @@
 </div>
 
 @code {
+    private class ComicCategory
+    {
+        public string Name { get; set; } = "";
+        public List<ComicInfo> Comics { get; set; } = [];
+    }
+    private List<ComicCategory> categories = [];
     private record ComicInfo(string Id, string Name);
 
     private bool signedIn;
@@ -93,17 +123,40 @@
             signInError = "No se pudo conectar con Google. Inténtalo de nuevo.";
         }
     }
-
     private async Task LoadComics()
     {
-        loadingLibrary = true;
-        StateHasChanged();
+        try{
+            loadingLibrary = true;
+            Console.WriteLine("loading");
+            StateHasChanged();
 
-        var result = await JS.InvokeAsync<DriveFile[]>("driveAuth.listComics");
-        comics = result.Select(f => new ComicInfo(f.Id, f.Name)).ToList();
+            categories = await JS.InvokeAsync<List<ComicCategory>>(
+                "driveAuth.listComicsByCategory");
+            Console.WriteLine("loading2");
+            loadingLibrary = false;
+            StateHasChanged();
+        }
+        catch(Exception e)
+        {
+            Console.WriteLine(e.Message);
+        }
+    }
+    private async Task LoadComics2()
+    {
+        try{
+            loadingLibrary = true;
+            StateHasChanged();
 
-        loadingLibrary = false;
-        StateHasChanged();
+            var result = await JS.InvokeAsync<DriveFile[]>("driveAuth.listComics");
+            comics = result.Select(f => new ComicInfo(f.Id, f.Name)).ToList();
+
+            loadingLibrary = false;
+            StateHasChanged();
+        }
+        catch(Exception e)
+        {
+            Console.WriteLine(e.Message);
+        }
     }
 
     private async Task OpenComic(ComicInfo comic)
@@ -166,4 +219,5 @@
         public string Id { get; set; } = "";
         public string Name { get; set; } = "";
     }
+    
 }
