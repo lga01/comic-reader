@@ -1,22 +1,38 @@
 @echo off
-REM deploy.bat - Compila el proyecto y publica el resultado en GitHub Pages
-REM Ejecutar desde la raíz del proyecto (junto al .csproj)
 
-echo Compilando en modo Release...
+echo ========================================
+echo Limpiando proyecto...
+echo ========================================
+
+if exist bin rmdir /s /q bin
+if exist obj rmdir /s /q obj
+
+echo.
+echo ========================================
+echo Compilando...
+echo ========================================
+
 dotnet publish -c Release
+
 if errorlevel 1 (
-    echo ERROR: fallo la compilacion. Cancelando.
+    echo.
+    echo ERROR: La compilacion ha fallado.
+    pause
     exit /b 1
 )
 
 echo.
-echo Anadiendo el build al commit...
-git add bin\Release\net10.0\publish\wwwroot -f
-git commit -m "Build actualizado"
+echo ========================================
+echo Subiendo cambios...
+echo ========================================
+
+git add .
+git commit -m "latest changes"
+git push origin main
 
 echo.
-echo Publicando en gh-pages...
-git subtree push --prefix bin/Release/net10.0/publish/wwwroot origin gh-pages
+echo ========================================
+echo Despliegue completado
+echo ========================================
 
-echo.
-echo Hecho. Espera un par de minutos y recarga la web.
+pause
