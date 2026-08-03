@@ -9,10 +9,10 @@ window.driveAuth = (() => {
     // =========================================================
     const CLIENT_ID = "745002194169-gq3h30lbsg2sgndpumv4ko4sa6pjq7kp.apps.googleusercontent.com";
 
-    const SCOPES = [
-        "https://www.googleapis.com/auth/drive.readonly",
-        "https://www.googleapis.com/auth/drive.appdata"
-    ].join(" ");
+    // Acceso completo de lectura/escritura a Drive: hace falta para poder
+    // crear/actualizar progreso.json dentro de las carpetas normales
+    // (drive.readonly ya no basta, porque solo permite leer).
+    const SCOPES = "https://www.googleapis.com/auth/drive";
 
     const PROGRESS_FILE_NAME = "progreso.json";
 
@@ -52,7 +52,7 @@ window.driveAuth = (() => {
         return { Authorization: "Bearer " + accessToken };
     }
 
-    // ---------- Listar cómics ----------
+    // ---------- Listar cómics (plano, sin categorías) ----------
 
     async function listComics() {
         const params = new URLSearchParams({
@@ -71,32 +71,24 @@ window.driveAuth = (() => {
         const data = await res.json();
         return data.files.map(f => ({ id: f.id, name: f.name }));
     }
+
+    // ---------- Listar cómics agrupados por categoría (subcarpeta de "Comics") ----------
+
     async function listComicsByCategory() {
         try {
-
             console.log("=== INICIO listComicsByCategory ===");
 
             // 1. Buscar carpeta Comics
             const rootQuery =
                 "name = 'Comics' and mimeType = 'application/vnd.google-apps.folder' and trashed = false";
 
-            console.log("Buscando carpeta Comics...");
-            console.log("Query:", rootQuery);
-
             const rootRes = await fetch(
                 "https://www.googleapis.com/drive/v3/files?" +
-                new URLSearchParams({
-                    q: rootQuery,
-                    fields: "files(id,name)"
-                }),
+                new URLSearchParams({ q: rootQuery, fields: "files(id,name)" }),
                 { headers: authHeaders() }
             );
 
-            console.log("Respuesta carpeta Comics:", rootRes.status);
-
             const rootData = await rootRes.json();
-
-            console.log("Root data:", rootData);
 
             if (!rootData.files?.length) {
                 console.warn("NO se encontró la carpeta Comics");
@@ -105,16 +97,9 @@ window.driveAuth = (() => {
 
             const comicsFolder = rootData.files[0];
 
-            console.log("Carpeta Comics encontrada:");
-            console.log("ID:", comicsFolder.id);
-            console.log("Nombre:", comicsFolder.name);
-
-            // 2. Buscar subcarpetas
+            // 2. Buscar subcarpetas (categorías)
             const foldersQuery =
                 `'${comicsFolder.id}' in parents and mimeType = 'application/vnd.google-apps.folder' and trashed = false`;
-
-            console.log("Buscando subcarpetas...");
-            console.log("Query:", foldersQuery);
 
             const foldersRes = await fetch(
                 "https://www.googleapis.com/drive/v3/files?" +
@@ -127,24 +112,12 @@ window.driveAuth = (() => {
                 { headers: authHeaders() }
             );
 
-            console.log("Respuesta subcarpetas:", foldersRes.status);
-
             const foldersData = await foldersRes.json();
-
-            console.log("Subcarpetas encontradas:", foldersData.files);
-
             const result = [];
 
             for (const folder of foldersData.files ?? []) {
-
-                console.log("--------------------------------");
-                console.log("Procesando carpeta:", folder.name);
-                console.log("ID:", folder.id);
-
                 const comicsQuery =
                     `'${folder.id}' in parents and name contains '.cbz' and trashed = false`;
-
-                console.log("Query comics:", comicsQuery);
 
                 const comicsRes = await fetch(
                     "https://www.googleapis.com/drive/v3/files?" +
@@ -157,26 +130,28 @@ window.driveAuth = (() => {
                     { headers: authHeaders() }
                 );
 
-                console.log(
-                    `Respuesta comics (${folder.name}):`,
-                    comicsRes.status
-                );
-
                 const comicsData = await comicsRes.json();
 
-                console.log(
-                    `Comics encontrados en ${folder.name}:`,
-                    comicsData.files?.length ?? 0
-                );
+                // Progreso guardado en la carpeta de esta categoría
+                const progress = await readFolderProgress(folder.id);
 
-                console.log(comicsData.files);
+                const comicsWithProgress = (comicsData.files ?? [])
+                    .map(f => {
+                        const p = progress[f.name];
+                        return {
+                            id: f.id,
+                            name: f.name,
+                            leido: p ? !!p.leido : false,
+                            pagina: (p && p.pagina != null) ? p.pagina : null,
+                            totalPaginas: (p && p.totalPaginas != null) ? p.totalPaginas : null
+                        };
+                    })
+                    .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
 
                 result.push({
+                    folderId: folder.id,
                     name: folder.name,
-                    comics: (comicsData.files ?? []).map(f => ({
-                        id: f.id,
-                        name: f.name
-                    }))
+                    comics: comicsWithProgress
                 });
             }
 
@@ -190,6 +165,7 @@ window.driveAuth = (() => {
             throw err;
         }
     }
+
     // ---------- Abrir y leer un cómic ----------
 
     function guessMime(name) {
@@ -245,12 +221,11 @@ window.driveAuth = (() => {
         return currentPageUrls;
     }
 
-    // ---------- Progreso (guardado como JSON en appDataFolder) ----------
+    // ---------- Progreso: un progreso.json por carpeta de categoría ----------
 
-    async function findProgressFileId() {
+    async function findProgressFileId(folderId) {
         const params = new URLSearchParams({
-            q: `name = '${PROGRESS_FILE_NAME}' and trashed = false`,
-            spaces: "appDataFolder",
+            q: `name = '${PROGRESS_FILE_NAME}' and '${folderId}' in parents and trashed = false`,
             fields: "files(id)"
         });
 
@@ -259,20 +234,18 @@ window.driveAuth = (() => {
         });
 
         if (!res.ok) throw new Error("Error buscando progreso.json: " + res.status);
-
         const data = await res.json();
         return data.files.length > 0 ? data.files[0].id : null;
     }
 
-    async function readProgressData() {
-        const fileId = await findProgressFileId();
+    async function readFolderProgress(folderId) {
+        const fileId = await findProgressFileId(folderId);
         if (!fileId) return {};
 
         const res = await fetch(
             `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`,
             { headers: authHeaders() }
         );
-
         if (!res.ok) return {};
 
         try {
@@ -282,13 +255,12 @@ window.driveAuth = (() => {
         }
     }
 
-    async function writeProgressData(data) {
-        const fileId = await findProgressFileId();
-        const content = JSON.stringify(data);
+    async function writeFolderProgress(folderId, data) {
+        const fileId = await findProgressFileId(folderId);
+        const content = JSON.stringify(data, null, 2);
         const blob = new Blob([content], { type: "application/json" });
 
         if (fileId) {
-            // Actualizar archivo existente
             await fetch(
                 `https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media`,
                 {
@@ -298,8 +270,7 @@ window.driveAuth = (() => {
                 }
             );
         } else {
-            // Crear archivo nuevo dentro de appDataFolder
-            const metadata = { name: PROGRESS_FILE_NAME, parents: ["appDataFolder"] };
+            const metadata = { name: PROGRESS_FILE_NAME, parents: [folderId] };
             const form = new FormData();
             form.append("metadata", new Blob([JSON.stringify(metadata)], { type: "application/json" }));
             form.append("file", blob);
@@ -315,16 +286,39 @@ window.driveAuth = (() => {
         }
     }
 
-    async function getProgress(fileId) {
-        const data = await readProgressData();
-        return data[fileId]?.pagina ?? 0;
+    async function getComicProgress(folderId, comicName) {
+        const data = await readFolderProgress(folderId);
+        return data[comicName] || null;
     }
 
-    async function saveProgress(fileId, page) {
-        const data = await readProgressData();
-        data[fileId] = { pagina: page };
-        await writeProgressData(data);
+    // Se llama cada vez que el usuario cambia de página leyendo un cómic
+    async function saveComicPage(folderId, comicName, page, totalPages) {
+        const data = await readFolderProgress(folderId);
+        const leido = (page + 1) >= totalPages;
+        data[comicName] = { leido, pagina: page, totalPaginas: totalPages };
+        await writeFolderProgress(folderId, data);
     }
 
-    return { signIn, isSignedIn, listComics, listComicsByCategory, openComic, getProgress, saveProgress };
+    // Se llama al pulsar el botón de marcar leído/no leído a mano
+    async function setComicRead(folderId, comicName, leido) {
+        const data = await readFolderProgress(folderId);
+        const existing = data[comicName] || {};
+        const updated = { ...existing, leido };
+        if (leido && existing.totalPaginas) {
+            updated.pagina = existing.totalPaginas - 1;
+        }
+        data[comicName] = updated;
+        await writeFolderProgress(folderId, data);
+    }
+
+    return {
+        signIn,
+        isSignedIn,
+        listComics,
+        listComicsByCategory,
+        openComic,
+        getComicProgress,
+        saveComicPage,
+        setComicRead
+    };
 })();

@@ -32,12 +32,6 @@
             else
             {
                 <ul class="comic-list">
-                    @* @foreach (var comic in comics)
-                    {
-                        <li @onclick="() => OpenComic(comic)">
-                            <span class="comic-name">@comic.Name</span>
-                        </li>
-                    } *@
                     @foreach (var category in categories)
                     {
                         <details class="comic-folder">
@@ -54,8 +48,23 @@
                                 <ul class="comic-list">
                                     @foreach (var comic in category.Comics)
                                     {
-                                        <li @onclick="() => OpenComic(comic)">
-                                            📖 @comic.Name
+                                        <li class="comic-row">
+                                            <span class="comic-name" @onclick="() => OpenComic(category, comic)">
+                                                📖 @comic.Name
+                                            </span>
+                                            <span class="comic-status">
+                                                @if (comic.Leido)
+                                                {
+                                                    <span class="badge badge-leido">✓ Leído</span>
+                                                }
+                                                else if (comic.Pagina != null && comic.TotalPaginas != null)
+                                                {
+                                                    <span class="badge badge-progreso">@(comic.Pagina + 1)/@comic.TotalPaginas</span>
+                                                }
+                                                <button class="btn-toggle" @onclick="() => ToggleRead(category, comic)" title="Marcar leído/no leído">
+                                                    @(comic.Leido ? "↺" : "✓")
+                                                </button>
+                                            </span>
                                         </li>
                                     }
                                 </ul>
@@ -94,17 +103,27 @@
 @code {
     private class ComicCategory
     {
+        public string FolderId { get; set; } = "";
         public string Name { get; set; } = "";
         public List<ComicInfo> Comics { get; set; } = [];
     }
+
+    private class ComicInfo
+    {
+        public string Id { get; set; } = "";
+        public string Name { get; set; } = "";
+        public bool Leido { get; set; }
+        public int? Pagina { get; set; }
+        public int? TotalPaginas { get; set; }
+    }
+
     private List<ComicCategory> categories = [];
-    private record ComicInfo(string Id, string Name);
 
     private bool signedIn;
     private string? signInError;
     private bool loadingLibrary;
 
-    private List<ComicInfo> comics = new();
+    private ComicCategory? currentCategory;
     private ComicInfo? currentComic;
     private List<string> pageUrls = new();
     private int currentPage;
@@ -123,44 +142,30 @@
             signInError = "No se pudo conectar con Google. Inténtalo de nuevo.";
         }
     }
+
     private async Task LoadComics()
     {
-        try{
+        try
+        {
             loadingLibrary = true;
-            Console.WriteLine("loading");
             StateHasChanged();
 
             categories = await JS.InvokeAsync<List<ComicCategory>>(
                 "driveAuth.listComicsByCategory");
-            Console.WriteLine("loading2");
-            loadingLibrary = false;
-            StateHasChanged();
-        }
-        catch(Exception e)
-        {
-            Console.WriteLine(e.Message);
-        }
-    }
-    private async Task LoadComics2()
-    {
-        try{
-            loadingLibrary = true;
-            StateHasChanged();
-
-            var result = await JS.InvokeAsync<DriveFile[]>("driveAuth.listComics");
-            comics = result.Select(f => new ComicInfo(f.Id, f.Name)).ToList();
 
             loadingLibrary = false;
             StateHasChanged();
         }
-        catch(Exception e)
+        catch (Exception e)
         {
             Console.WriteLine(e.Message);
+            loadingLibrary = false;
         }
     }
 
-    private async Task OpenComic(ComicInfo comic)
+    private async Task OpenComic(ComicCategory category, ComicInfo comic)
     {
+        currentCategory = category;
         currentComic = comic;
         pageUrls.Clear();
         currentPage = 0;
@@ -169,14 +174,15 @@
         var urls = await JS.InvokeAsync<string[]>("driveAuth.openComic", comic.Id);
         pageUrls = urls.ToList();
 
-        var savedPage = await JS.InvokeAsync<int>("driveAuth.getProgress", comic.Id);
-        currentPage = savedPage < pageUrls.Count ? savedPage : 0;
+        // Si ya había progreso guardado, retomamos esa página
+        currentPage = (comic.Pagina != null && comic.Pagina < pageUrls.Count) ? comic.Pagina.Value : 0;
 
         StateHasChanged();
     }
 
     private void CloseComic()
     {
+        currentCategory = null;
         currentComic = null;
         pageUrls.Clear();
         currentPage = 0;
@@ -202,10 +208,40 @@
 
     private async Task SaveProgress()
     {
-        if (currentComic != null)
+        // Capturamos referencias locales ANTES del await: si el usuario cierra
+        // el cómic o cambia de página muy rápido mientras esta llamada está en
+        // marcha, currentCategory/currentComic pueden pasar a null mientras
+        // esperamos la respuesta. Usando variables locales evitamos que eso
+        // provoque un NullReferenceException al continuar después del await.
+        var category = currentCategory;
+        var comic = currentComic;
+        var page = currentPage;
+        var total = pageUrls.Count;
+
+        if (category == null || comic == null) return;
+
+        await JS.InvokeVoidAsync("driveAuth.saveComicPage",
+            category.FolderId, comic.Name, page, total);
+
+        // Reflejamos el cambio también en memoria, para que la biblioteca
+        // muestre el estado correcto al volver, sin tener que recargar
+        comic.Pagina = page;
+        comic.TotalPaginas = total;
+        comic.Leido = (page + 1) >= total;
+    }
+
+    private async Task ToggleRead(ComicCategory category, ComicInfo comic)
+    {
+        var nuevoEstado = !comic.Leido;
+        await JS.InvokeVoidAsync("driveAuth.setComicRead", category.FolderId, comic.Name, nuevoEstado);
+
+        // Actualizamos el estado en memoria, sin recargar toda la lista desde Drive
+        comic.Leido = nuevoEstado;
+        if (nuevoEstado && comic.TotalPaginas.HasValue)
         {
-            await JS.InvokeVoidAsync("driveAuth.saveProgress", currentComic.Id, currentPage);
+            comic.Pagina = comic.TotalPaginas.Value - 1;
         }
+        StateHasChanged();
     }
 
     private async Task HandleKeyDown(KeyboardEventArgs e)
@@ -213,11 +249,4 @@
         if (e.Key == "ArrowRight") await NextPage();
         else if (e.Key == "ArrowLeft") await PrevPage();
     }
-
-    private class DriveFile
-    {
-        public string Id { get; set; } = "";
-        public string Name { get; set; } = "";
-    }
-    
 }
