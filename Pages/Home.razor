@@ -77,15 +77,29 @@
     }
     else
     {
-        <div class="reader" tabindex="0" @onkeydown="HandleKeyDown">
+        <div class="reader" id="reader-container" tabindex="0" @onkeydown="HandleKeyDown">
             <div class="reader-toolbar">
                 <button @onclick="CloseComic">← Biblioteca</button>
                 <span>@currentComic.Name (@(pageUrls.Count > 0 ? currentPage + 1 : 0) / @pageUrls.Count)</span>
+                <span class="zoom-controls">
+                    <button @onclick="ZoomOut" title="Alejar">−</button>
+                    <button @onclick="ResetZoom" title="Restablecer zoom">@((int)(zoom * 100))%</button>
+                    <button @onclick="ZoomIn" title="Acercar">+</button>
+                    <button @onclick="ToggleFullscreen" title="Pantalla completa">⛶</button>
+                </span>
             </div>
-            <div class="reader-page" @onclick="NextPage">
+            <div class="reader-page"
+                 @onwheel="OnWheel" @onwheel:preventDefault="true"
+                 @onmousedown="OnMouseDown"
+                 @onmousemove="OnMouseMove"
+                 @onmouseup="OnMouseUp"
+                 @onmouseleave="OnMouseLeave"
+                 @ondblclick="OnDoubleClick">
                 @if (pageUrls.Count > 0)
                 {
-                    <img src="@pageUrls[currentPage]" alt="página @(currentPage + 1)" />
+                    <img src="@pageUrls[currentPage]" alt="página @(currentPage + 1)"
+                         draggable="false"
+                         style="transform: scale(@zoom.ToString(System.Globalization.CultureInfo.InvariantCulture)) translate(@(panX.ToString(System.Globalization.CultureInfo.InvariantCulture))px, @(panY.ToString(System.Globalization.CultureInfo.InvariantCulture))px); cursor: @(zoom > 1 ? (isDragging ? "grabbing" : "grab") : "pointer");" />
                 }
                 else
                 {
@@ -128,6 +142,100 @@
     private List<string> pageUrls = new();
     private int currentPage;
 
+    // Zoom y arrastre
+    private double zoom = 1.0;
+    private double panX = 0;
+    private double panY = 0;
+    private bool isDragging;
+    private bool hasDragged;
+    private double dragStartX, dragStartY;
+    private double dragStartPanX, dragStartPanY;
+
+    private const double ZoomStep = 0.25;
+    private const double ZoomMin = 1.0;
+    private const double ZoomMax = 4.0;
+
+    private void ResetZoomState()
+    {
+        zoom = 1.0;
+        panX = 0;
+        panY = 0;
+    }
+
+    private void ZoomIn()
+    {
+        zoom = Math.Min(ZoomMax, Math.Round(zoom + ZoomStep, 2));
+    }
+
+    private void ZoomOut()
+    {
+        zoom = Math.Max(ZoomMin, Math.Round(zoom - ZoomStep, 2));
+        if (zoom <= ZoomMin) { panX = 0; panY = 0; }
+    }
+
+    private void ResetZoom() => ResetZoomState();
+
+    private void OnWheel(WheelEventArgs e)
+    {
+        if (e.DeltaY < 0) ZoomIn();
+        else ZoomOut();
+    }
+
+    private void OnDoubleClick()
+    {
+        if (zoom > ZoomMin) ResetZoomState();
+        else zoom = 2.0;
+    }
+
+    private void OnMouseDown(MouseEventArgs e)
+    {
+        isDragging = true;
+        hasDragged = false;
+        dragStartX = e.ClientX;
+        dragStartY = e.ClientY;
+        dragStartPanX = panX;
+        dragStartPanY = panY;
+    }
+
+    private void OnMouseMove(MouseEventArgs e)
+    {
+        if (!isDragging) return;
+
+        var dx = e.ClientX - dragStartX;
+        var dy = e.ClientY - dragStartY;
+
+        if (Math.Abs(dx) > 3 || Math.Abs(dy) > 3) hasDragged = true;
+
+        if (zoom > ZoomMin)
+        {
+            // Dividimos por zoom para que el arrastre siga el ratón 1:1 en pantalla
+            panX = dragStartPanX + dx / zoom;
+            panY = dragStartPanY + dy / zoom;
+        }
+    }
+
+    private async Task OnMouseUp(MouseEventArgs e)
+    {
+        var wasDragging = isDragging;
+        isDragging = false;
+
+        // Si no hubo arrastre real, se trata como un click normal para pasar página
+        if (wasDragging && !hasDragged && zoom <= ZoomMin)
+        {
+            await NextPage();
+        }
+    }
+
+    private void OnMouseLeave()
+    {
+        isDragging = false;
+    }
+
+    private async Task ToggleFullscreen()
+    {
+        await JS.InvokeAsync<bool>("readerUtils.toggleFullscreen", "reader-container");
+    }
+
     private async Task SignIn()
     {
         signInError = null;
@@ -169,6 +277,7 @@
         currentComic = comic;
         pageUrls.Clear();
         currentPage = 0;
+        ResetZoomState();
         StateHasChanged();
 
         var urls = await JS.InvokeAsync<string[]>("driveAuth.openComic", comic.Id);
@@ -186,6 +295,7 @@
         currentComic = null;
         pageUrls.Clear();
         currentPage = 0;
+        ResetZoomState();
     }
 
     private async Task NextPage()
@@ -193,6 +303,7 @@
         if (currentPage < pageUrls.Count - 1)
         {
             currentPage++;
+            ResetZoomState();
             await SaveProgress();
         }
     }
@@ -202,6 +313,7 @@
         if (currentPage > 0)
         {
             currentPage--;
+            ResetZoomState();
             await SaveProgress();
         }
     }

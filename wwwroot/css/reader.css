@@ -50,7 +50,7 @@
 }
 
 .comic-list li:hover {
-    background: #f3f4f6;
+    background: #5276be;
 }
 
 .reader {
@@ -101,7 +101,7 @@
     padding: 0.5rem 1rem;
     border-radius: 8px;
     border: 1px solid #d1d5db;
-    background: white;
+    background: #5276be;
     cursor: pointer;
 }
 
@@ -150,4 +150,38 @@
 .empty-folder {
     opacity: 0.7;
     font-style: italic;
+}
+/* Añadir a wwwroot/css/reader.css */
+
+.zoom-controls {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+}
+
+.zoom-controls button {
+    background: #5276be;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    min-width: 2rem;
+    height: 1.8rem;
+    cursor: pointer;
+    font-size: 0.85rem;
+}
+
+.zoom-controls button:hover {
+    background: #e5e7eb;
+}
+
+.reader-page img {
+    transition: transform 0.05s linear;
+    user-select: none;
+}
+
+.reader:fullscreen {
+    background: #000;
+}
+
+.reader:fullscreen .reader-page {
+    height: calc(100vh - 3rem);
 }
